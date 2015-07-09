@@ -69,12 +69,13 @@ static char const * const kEmptyDataSetView =       "emptyDataSetView";
     {
         view = [DZNEmptyDataSetView new];
         view.autoresizingMask = UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
+        view.userInteractionEnabled = YES;
         view.hidden = YES;
         
         view.tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dzn_didTapContentView:)];
         view.tapGesture.delegate = self;
         [view addGestureRecognizer:view.tapGesture];
-
+        
         [self setEmptyDataSetView:view];
     }
     return view;
@@ -169,16 +170,6 @@ static char const * const kEmptyDataSetView =       "emptyDataSetView";
     return nil;
 }
 
-- (UIColor *)dzn_imageTintColor
-{
-    if (self.emptyDataSetSource && [self.emptyDataSetSource respondsToSelector:@selector(imageTintColorForEmptyDataSet:)]) {
-        UIColor *color = [self.emptyDataSetSource imageTintColorForEmptyDataSet:self];
-        if (color) NSAssert([color isKindOfClass:[UIColor class]], @"You must return a valid UIColor object -imageTintColorForEmptyDataSet:");
-        return color;
-    }
-    return nil;
-}
-
 - (NSAttributedString *)dzn_buttonTitleForState:(UIControlState)state
 {
     if (self.emptyDataSetSource && [self.emptyDataSetSource respondsToSelector:@selector(buttonTitleForEmptyDataSet:forState:)]) {
@@ -221,10 +212,10 @@ static char const * const kEmptyDataSetView =       "emptyDataSetView";
 
 - (CGPoint)dzn_offset
 {
-    CGFloat top = roundf(self.contentInset.top / 2.0);
-    CGFloat left = roundf(self.contentInset.left / 2.0);
-    CGFloat bottom = roundf(self.contentInset.bottom / 2.0);
-    CGFloat right = roundf(self.contentInset.right / 2.0);
+    CGFloat top = self.contentInset.top / 2.0;
+    CGFloat left = self.contentInset.left / 2.0;
+    CGFloat bottom = self.contentInset.bottom / 2.0;
+    CGFloat right = self.contentInset.right / 2.0;
     
     // Honors the scrollView's contentInset
     CGPoint offset = CGPointMake(left-right, top-bottom);
@@ -272,17 +263,10 @@ static char const * const kEmptyDataSetView =       "emptyDataSetView";
     return NO;
 }
 
-- (void)dzn_willAppear
+- (void)dzn_willWillAppear
 {
     if (self.emptyDataSetDelegate && [self.emptyDataSetDelegate respondsToSelector:@selector(emptyDataSetWillAppear:)]) {
         [self.emptyDataSetDelegate emptyDataSetWillAppear:self];
-    }
-}
-
-- (void)dzn_didAppear
-{
-    if (self.emptyDataSetDelegate && [self.emptyDataSetDelegate respondsToSelector:@selector(emptyDataSetDidAppear:)]) {
-        [self.emptyDataSetDelegate emptyDataSetDidAppear:self];
     }
 }
 
@@ -372,15 +356,15 @@ static char const * const kEmptyDataSetView =       "emptyDataSetView";
     if ([self dzn_shouldDisplay] && [self dzn_itemsCount] == 0)
     {
         // Notifies that the empty dataset view will appear
-        [self dzn_willAppear];
+        [self dzn_willWillAppear];
         
         DZNEmptyDataSetView *view = self.emptyDataSetView;
         UIView *customView = [self dzn_customView];
         
         if (!view.superview) {
-
+            
             // Send the view to back, in case a header and/or footer is present
-            if (([self isKindOfClass:[UITableView class]] || [self isKindOfClass:[UICollectionView class]]) && self.subviews.count > 1) {
+            if ([self isKindOfClass:[UITableView class]] && self.subviews.count > 1) {
                 [self insertSubview:view atIndex:1];
             }
             else {
@@ -401,19 +385,15 @@ static char const * const kEmptyDataSetView =       "emptyDataSetView";
             view.titleLabel.attributedText = [self dzn_titleLabelText];
             
             // Configure imageview
-            UIColor *tintColor = [self dzn_imageTintColor];
-            UIImage *image = [self dzn_image];
-            UIImageRenderingMode renderingMode = tintColor ? UIImageRenderingModeAlwaysTemplate : UIImageRenderingModeAlwaysOriginal;
-            
-            view.imageView.image = [image imageWithRenderingMode:renderingMode];
-            view.imageView.tintColor = tintColor;
+            view.imageView.image = [self dzn_image];
             
             // Configure button
-            [view.button setAttributedTitle:[self dzn_buttonTitleForState:UIControlStateNormal] forState:UIControlStateNormal];
-            [view.button setAttributedTitle:[self dzn_buttonTitleForState:UIControlStateHighlighted] forState:UIControlStateHighlighted];
-            [view.button setBackgroundImage:[self dzn_buttonBackgroundImageForState:UIControlStateNormal] forState:UIControlStateNormal];
-            [view.button setBackgroundImage:[self dzn_buttonBackgroundImageForState:UIControlStateHighlighted] forState:UIControlStateHighlighted];
-
+            [view.button setAttributedTitle:[self dzn_buttonTitleForState:0] forState:0];
+            [view.button setAttributedTitle:[self dzn_buttonTitleForState:1] forState:1];
+            [view.button setBackgroundImage:[self dzn_buttonBackgroundImageForState:0] forState:0];
+            [view.button setBackgroundImage:[self dzn_buttonBackgroundImageForState:1] forState:1];
+            [view.button setUserInteractionEnabled:[self dzn_isTouchAllowed]];
+            
             // Configure spacing
             view.verticalSpace = [self dzn_verticalSpace];
         }
@@ -430,12 +410,6 @@ static char const * const kEmptyDataSetView =       "emptyDataSetView";
         
         // Configure scroll permission
         self.scrollEnabled = [self dzn_isScrollAllowed];
-
-        // Configure empty dataset userInteraction permission
-        view.userInteractionEnabled = [self dzn_isTouchAllowed];
-
-        // Notifies that the empty dataset view did appear
-        [self dzn_didAppear];
     }
     else if (self.isEmptyDataSetVisible) {
         [self dzn_invalidate];
@@ -446,7 +420,7 @@ static char const * const kEmptyDataSetView =       "emptyDataSetView";
 {
     // Notifies that the empty dataset view will disappear
     [self dzn_willDisappear];
-
+    
     if (self.emptyDataSetView) {
         [self.emptyDataSetView removeAllSubviews];
         [self.emptyDataSetView removeFromSuperview];
@@ -493,7 +467,7 @@ void dzn_original_implementation(id self, SEL _cmd)
     // We then inject the additional implementation for reloading the empty dataset
     // Doing it before calling the original implementation does update the 'isEmptyDataSetVisible' flag on time.
     [self dzn_reloadEmptyDataSet];
-
+    
     // If found, call original implementation
     if (impPointer) {
         ((void(*)(id,SEL))impPointer)(self,_cmd);
@@ -577,17 +551,24 @@ NSString *dzn_implementationKey(id target, SEL selector)
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 {
     UIGestureRecognizer *tapGesture = self.emptyDataSetView.tapGesture;
-
+    
     if ([gestureRecognizer isEqual:tapGesture] || [otherGestureRecognizer isEqual:tapGesture]) {
         return YES;
     }
-
-    // defer to emptyDataSetDelegate's implementation if available
-    if ( (self.emptyDataSetDelegate != self) && [self.emptyDataSetDelegate respondsToSelector:@selector(gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:)]) {
-        return [(id)self.emptyDataSetDelegate gestureRecognizer:gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:otherGestureRecognizer];
-    }
     
-    return NO;
+    // check if the delegate is implemented
+    if (self.emptyDataSetDelegate == nil) {
+        return NO;
+    }
+    else{
+        // if it is then check if user has his own implementation of silmutaneous gestures
+        if ([self.emptyDataSetDelegate respondsToSelector:@selector(gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:)]) {
+            return [[self.emptyDataSetDelegate performSelector:@selector(gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:) withObject:gestureRecognizer withObject:otherGestureRecognizer] boolValue];
+        }
+        else {
+            return NO;
+        }
+    }
 }
 
 
@@ -648,7 +629,7 @@ NSString *dzn_implementationKey(id target, SEL selector)
         _imageView.contentMode = UIViewContentModeScaleAspectFit;
         _imageView.userInteractionEnabled = NO;
         _imageView.accessibilityLabel = @"empty set background image";
-
+        
         [_contentView addSubview:_imageView];
     }
     return _imageView;
@@ -704,7 +685,7 @@ NSString *dzn_implementationKey(id target, SEL selector)
         _button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
         _button.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
         _button.accessibilityLabel = @"empty set button";
-
+        
         [_button addTarget:self action:@selector(didTapButton:) forControlEvents:UIControlEventTouchUpInside];
         
         [_contentView addSubview:_button];
@@ -835,8 +816,7 @@ NSString *dzn_implementationKey(id target, SEL selector)
         [views setObject:_imageView forKey:@"imageView"];
         [verticalSubviews addObject:@"[imageView(imgHeight)]"];
         
-        [self.contentView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-trailing-[imageView(imgWidth)]-trailing-|"
-                                                                                 options:0 metrics:metrics views:views]];
+        [self.contentView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-trailing-[imageView(imgWidth)]-trailing-|" options:0 metrics:metrics views:views]];
     }
     
     // Assign the title label's horizontal constraints
@@ -844,8 +824,7 @@ NSString *dzn_implementationKey(id target, SEL selector)
         [views setObject:_titleLabel forKey:@"titleLabel"];
         [verticalSubviews addObject:@"[titleLabel]"];
         
-        [self.contentView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-padding-[titleLabel]-padding-|"
-                                                                                 options:0 metrics:metrics views:views]];
+        [self.contentView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-padding-[titleLabel]-padding-|" options:0 metrics:metrics views:views]];
     }
     // or removes from its superview
     else {
@@ -881,14 +860,14 @@ NSString *dzn_implementationKey(id target, SEL selector)
         _button = nil;
     }
     
-
-    // Build the string format for the vertical constraints, adding a margin between each element. Default is 11.
-    NSString *verticalFormat = [verticalSubviews componentsJoinedByString:[NSString stringWithFormat:@"-(%.f)-", self.verticalSpace ?: 11]];
+    
+    // Build the string format for the vertical constraints, adding a margin between each element. Default is 10.
+    NSString *verticalFormat = [verticalSubviews componentsJoinedByString:[NSString stringWithFormat:@"-%.f-", self.verticalSpace ?: 10]];
     
     // Assign the vertical constraints to the content view
     if (verticalFormat.length > 0) {
-        [self.contentView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:[NSString stringWithFormat:@"V:|%@|", verticalFormat]
-                                                                             options:0 metrics:metrics views:views]];
+        [self.contentView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:[NSString stringWithFormat:@"V:|-[imageView(imgHeight)]-20-[titleLabel]-10-[detailLabel]-10-|", verticalFormat]
+                                                                                 options:0 metrics:metrics views:views]];
     }
     
     [super updateConstraints];
